@@ -10,6 +10,11 @@ body,
   min-height: 100%;
 }
 
+/* lets native controls like <select> follow the user's theme */
+html {
+  color-scheme: light dark;
+}
+
 body {
   margin: 0;
 }

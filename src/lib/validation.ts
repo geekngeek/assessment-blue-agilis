@@ -42,11 +42,18 @@ export const updateTodoSchema = z
 
 export const todoIdInputSchema = z.object({ id: todoIdSchema })
 
-// doubles as the route search param schema so a filtered view is shareable by URL
+// strict: server function input, where garbage should be rejected outright
 export const todoFiltersSchema = z.object({
   q: z.string().trim().max(SEARCH_MAX_LENGTH).optional(),
   status: todoStatusSchema.optional(),
   sort: todoSortSchema.default('newest'),
+})
+
+// tolerant: url search params, where a hand-edited link should degrade instead of erroring
+export const todoSearchSchema = z.object({
+  q: z.string().trim().max(SEARCH_MAX_LENGTH).optional().catch(undefined),
+  status: todoStatusSchema.optional().catch(undefined),
+  sort: todoSortSchema.default('newest').catch('newest'),
 })
 
 export type CreateTodoInput = z.infer<typeof createTodoSchema>
