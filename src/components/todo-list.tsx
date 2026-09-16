@@ -1,7 +1,9 @@
-import { getRouteApi } from '@tanstack/react-router'
+import { getRouteApi, useRouterState } from '@tanstack/react-router'
 import { useSuspenseQuery } from '@tanstack/react-query'
 
+import { Spinner } from '#/components/spinner.tsx'
 import { TodoItem } from '#/components/todo-item.tsx'
+import { useDelayedFlag } from '#/hooks/use-delayed-flag.ts'
 import { pluralize } from '#/lib/format.ts'
 import { todosQueryOptions } from '#/lib/queries.ts'
 import { TODO_STATUS_LABELS } from '#/lib/todo.ts'
@@ -12,6 +14,10 @@ export function TodoList() {
   const search = routeApi.useSearch()
   const navigate = routeApi.useNavigate()
   const { data: todos } = useSuspenseQuery(todosQueryOptions(search))
+  const isRouteLoading = useRouterState({ select: (state) => state.isLoading })
+
+  // previous results stay on screen while the next set loads, just visibly de-emphasised
+  const isRefreshing = useDelayedFlag(isRouteLoading, 120)
 
   const isFiltered = Boolean(search.q) || Boolean(search.status)
 
@@ -25,7 +31,10 @@ export function TodoList() {
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center justify-between px-1 text-xs text-neutral-500 dark:text-neutral-400">
-        <span aria-live="polite">{pluralize(todos.length, 'todo')}</span>
+        <span className="flex items-center gap-2">
+          <span aria-live="polite">{pluralize(todos.length, 'todo')}</span>
+          {isRefreshing ? <Spinner className="size-3" /> : null}
+        </span>
         {isFiltered ? (
           <button
             type="button"
@@ -45,7 +54,9 @@ export function TodoList() {
           onClear={clearFilters}
         />
       ) : (
-        <ul className="overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+        <ul
+          className={`overflow-hidden rounded-xl border border-neutral-200 bg-white transition-opacity dark:border-neutral-800 dark:bg-neutral-900 ${isRefreshing ? 'opacity-50' : 'opacity-100'}`}
+        >
           {todos.map((todo) => (
             <TodoItem key={todo.id} todo={todo} />
           ))}

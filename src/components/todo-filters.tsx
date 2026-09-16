@@ -1,5 +1,9 @@
-import { getRouteApi } from '@tanstack/react-router'
+import { getRouteApi, useRouterState } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
+
+import { Spinner } from '#/components/spinner.tsx'
+import { useDebouncedValue } from '#/hooks/use-debounced-value.ts'
+import { useDelayedFlag } from '#/hooks/use-delayed-flag.ts'
 
 import {
   SEARCH_MAX_LENGTH,
@@ -14,6 +18,8 @@ const routeApi = getRouteApi('/')
 
 const SEARCH_DEBOUNCE_MS = 250
 
+const SPINNER_DELAY_MS = 120
+
 const SORT_LABELS: Record<TodoSort, string> = {
   newest: 'Newest first',
   oldest: 'Oldest first',
@@ -27,27 +33,34 @@ export function TodoFilters() {
   const search = routeApi.useSearch()
   const navigate = routeApi.useNavigate()
   const [query, setQuery] = useState(search.q ?? '')
+  const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS)
+  const isRouteLoading = useRouterState({ select: (state) => state.isLoading })
+
+  // the debounce window counts as loading too, so the spinner covers the whole wait
+  const isSettling = query.trim() !== (search.q ?? '')
+  const showSpinner = useDelayedFlag(
+    isSettling || isRouteLoading,
+    SPINNER_DELAY_MS,
+  )
 
   // resync when the url changes from somewhere else, such as a cleared filter
   useEffect(() => {
     setQuery(search.q ?? '')
   }, [search.q])
 
-  // debounced so every keystroke does not push a history entry or refetch
+  // navigates only once typing settles, so keystrokes do not each push history or refetch
   useEffect(() => {
-    if (query === (search.q ?? '')) {
+    const next = debouncedQuery.trim() || undefined
+
+    if (next === search.q) {
       return
     }
 
-    const timer = setTimeout(() => {
-      void navigate({
-        search: (previous) => ({ ...previous, q: query.trim() || undefined }),
-        replace: true,
-      })
-    }, SEARCH_DEBOUNCE_MS)
-
-    return () => clearTimeout(timer)
-  }, [query, search.q, navigate])
+    void navigate({
+      search: (previous) => ({ ...previous, q: next }),
+      replace: true,
+    })
+  }, [debouncedQuery, search.q, navigate])
 
   function selectStatus(status: TodoStatus | undefined) {
     void navigate({
@@ -74,9 +87,15 @@ export function TodoFilters() {
           aria-label="Search todos"
           className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 pr-16 text-sm outline-none placeholder:text-neutral-400 focus:border-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:focus:border-neutral-100"
         />
-        <kbd className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 rounded border border-neutral-300 px-1.5 py-0.5 text-[10px] text-neutral-400 dark:border-neutral-700 dark:text-neutral-500">
-          /
-        </kbd>
+        <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2">
+          {showSpinner ? (
+            <Spinner />
+          ) : (
+            <kbd className="rounded border border-neutral-300 px-1.5 py-0.5 text-[10px] text-neutral-400 dark:border-neutral-700 dark:text-neutral-500">
+              /
+            </kbd>
+          )}
+        </span>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
