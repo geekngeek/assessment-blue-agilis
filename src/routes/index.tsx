@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 
+import { TodoComposer } from '#/components/todo-composer.tsx'
 import { TodoFilters } from '#/components/todo-filters.tsx'
 import { TodoList } from '#/components/todo-list.tsx'
 import { todosQueryOptions } from '#/lib/queries.ts'
@@ -24,6 +25,7 @@ function Home() {
         </p>
       </header>
 
+      <TodoComposer />
       <TodoFilters />
       <TodoList />
     </main>
