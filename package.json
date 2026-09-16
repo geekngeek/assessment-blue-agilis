@@ -13,7 +13,12 @@
     "lint": "eslint",
     "format": "prettier --write . && eslint --fix",
     "check": "prettier --check .",
-    "db:check": "node scripts/db-check.ts"
+    "db:check": "node scripts/db-check.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node scripts/db-migrate.ts",
+    "db:push": "drizzle-kit push",
+    "db:pop": "node scripts/db-pop.ts",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

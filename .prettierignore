@@ -6,3 +6,4 @@ yarn.lock
 .tanstack
 dist
 src/routeTree.gen.ts
+drizzle/meta
