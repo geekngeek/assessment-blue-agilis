@@ -9,14 +9,14 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 
+import { TODO_STATUSES } from '#/lib/todo.ts'
+
 // postgres full-text search type; drizzle has no first-class tsvector
 const tsvector = customType<{ data: string; driverData: string }>({
   dataType() {
     return 'tsvector'
   },
 })
-
-export const TODO_STATUSES = ['todo', 'in_progress', 'done'] as const
 
 export const todoStatus = pgEnum('todo_status', TODO_STATUSES)
 
@@ -55,4 +55,3 @@ export const todos = pgTable(
 
 export type Todo = typeof todos.$inferSelect
 export type NewTodo = typeof todos.$inferInsert
-export type TodoStatus = (typeof TODO_STATUSES)[number]
