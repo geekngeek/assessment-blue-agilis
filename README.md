@@ -1,203 +1,121 @@
-Welcome to your new TanStack Start app!
+# Todo
 
-# Getting Started
+A to-do app built with TanStack Start server functions and Neon Postgres.
 
-To run this application:
+**Live:** _not deployed yet — URL goes here_
+**Planning notes:** [PLANNING.md](./PLANNING.md)
+
+## Stack
+
+| Concern          | Choice                                                      |
+| ---------------- | ----------------------------------------------------------- |
+| Framework        | TanStack Start (React 19, Vite)                             |
+| Routing & state  | TanStack Router — URL search params are the source of truth |
+| Data fetching    | TanStack Query with SSR hydration                           |
+| Database         | Neon serverless Postgres                                    |
+| ORM & migrations | Drizzle ORM + drizzle-kit                                   |
+| Validation       | Zod, shared between server functions and URL params         |
+| Styling          | Tailwind CSS                                                |
+
+## Features
+
+| #   | Requirement                 | Status                                                      |
+| --- | --------------------------- | ----------------------------------------------------------- |
+| 1   | Create to-dos               | Done — title, description, and status                       |
+| 2   | List to-dos                 | Done — server-rendered, newest first by default             |
+| 3   | Update to-dos               | Done — inline edit, or one-click status cycling             |
+| 4   | Delete to-dos               | Done — soft delete with undo                                |
+| 5   | Search to-dos               | Done — Postgres full-text search with partial-word fallback |
+| 6   | Filter by status            | Done — to-do / in progress / done                           |
+| 7   | Command palette & shortcuts | **Not implemented yet**                                     |
+
+Beyond the brief: optimistic updates with rollback, undo on delete, shareable filter URLs,
+debounced search, dark mode, and reversible migrations.
+
+## Quick start
+
+Requires Node 22+ (uses the built-in TypeScript loader and `process.loadEnvFile`).
 
 ```bash
 npm install
+cp .env.example .env     # add your Neon connection string
+npm run db:migrate       # create the schema
+npm run db:seed          # optional: 12 sample todos
 npm run dev
 ```
 
-# Building For Production
+### Environment
 
-To build this application for production:
+| Variable       | Required | Purpose                                  |
+| -------------- | -------- | ---------------------------------------- |
+| `DATABASE_URL` | yes      | Neon Postgres connection string (pooled) |
+| `NODE_ENV`     | no       | Defaults to `development`                |
 
-```bash
-npm run build
+Environment variables are read and validated in exactly one place, [`src/config/env.ts`](./src/config/env.ts).
+An ESLint rule fails the build if any other file touches `process.env`.
+
+## Scripts
+
+| Script                           | What it does                                         |
+| -------------------------------- | ---------------------------------------------------- |
+| `npm run dev`                    | Dev server                                           |
+| `npm run build`                  | Production build                                     |
+| `npm run lint` / `npm run check` | ESLint / Prettier check                              |
+| `npm run db:generate`            | Generate a migration from schema changes             |
+| `npm run db:migrate`             | Apply pending migrations                             |
+| `npm run db:pop`                 | Roll back the last applied migration                 |
+| `npm run db:push`                | Push schema directly, skipping migrations (dev only) |
+| `npm run db:seed`                | Reset and seed sample data                           |
+| `npm run db:check`               | Verify the database connection                       |
+| `npm run db:studio`              | Drizzle Studio                                       |
+
+## Architecture
+
+```
+src/
+  config/env.ts        validated environment, the only reader of process.env
+  db/schema.ts         drizzle table definition
+  db/todos.ts          SQL queries, plain async functions
+  server/todos.ts      server functions: validate input, delegate to db/todos.ts
+  lib/validation.ts    zod schemas shared by server functions and URL params
+  lib/mutations.ts     optimistic cache updates with rollback
+  components/          UI
+scripts/               migrate, pop, seed, connection check
+drizzle/               generated migrations, plus hand-written down/ counterparts
 ```
 
-## Styling
+**Server functions stay thin.** Each one validates with Zod and delegates to a plain async
+function in `src/db/todos.ts`. Server functions need Vite's build transform, so they cannot be
+called from Node; keeping the SQL in ordinary functions makes the data layer directly testable.
 
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
+**The URL is the state.** `q`, `status`, and `sort` live in search params validated by Zod, so any
+filtered view is shareable, bookmarkable, and works with the back button. Malformed params degrade
+to defaults instead of erroring.
 
-### Removing Tailwind CSS
+**Optimistic updates.** Mutations patch every cached filter combination immediately, snapshot the
+previous state, roll back on failure, and invalidate on settle so the server reconciles ordering.
 
-If you prefer not to use Tailwind CSS:
+## Data model
 
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Remove `@tailwindcss/vite` and `tailwindcss` from `package.json`
+One table. Notable columns:
 
-## Linting & Formatting
+- `status` — a Postgres enum, so an invalid value fails at the database, not just in TypeScript.
+- `search_vector` — a generated `tsvector` with a GIN index; it cannot drift from the content.
+- `deleted_at` — soft delete, which is what makes undo real rather than a UI illusion.
+- `completed_at` — set by the server on entering `done`, preserved if a done todo is re-marked.
 
-This project uses [eslint](https://eslint.org/) and [prettier](https://prettier.io/) for linting and formatting. Eslint is configured using [tanstack/eslint-config](https://tanstack.com/config/latest/docs/eslint). The following scripts are available:
+Search runs `websearch_to_tsquery` (handling quoted phrases and `-negation`) OR-ed with an escaped
+`ILIKE` so partial words like `gro` still match `groceries`.
 
-```bash
-npm run lint
-npm run format
-npm run check
-```
+## Trade-offs
 
-## Deploy to Vercel
+- **Dates render in UTC.** Relative timestamps would differ between server and client and break
+  hydration. Localised times belong behind a mount check.
+- **`db:pop` needs a hand-written down file** per migration, since Drizzle only generates forward
+  SQL. It fails loudly with the expected path rather than half-rolling-back.
+- **No auth.** The brief does not ask for it, and every todo is shared by every visitor.
 
-1. Push this repo to GitHub, GitLab, or Bitbucket
-2. In Vercel, choose **Add New > Project** and import the repo
-3. Keep the detected TanStack Start framework settings
-4. Add production values from `.env.example` under **Settings > Environment Variables**
-5. Deploy
+## What I would add next
 
-Vercel runs the build script and deploys Nitro's output as Vercel Functions and
-static assets. The included `vercel.json` makes framework detection explicit.
-
-Variables prefixed with `VITE_` are included in the browser bundle. Keep secrets
-unprefixed so they remain server-only.
-
-## Routing
-
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
-
-### Adding A Route
-
-To add a new route to your application just add a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from '@tanstack/react-router'
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'My App' },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-})
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from '@tanstack/react-start'
-
-const getServerTime = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return new Date().toISOString()
-})
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState('')
-
-  useEffect(() => {
-    getServerTime().then(setTime)
-  }, [])
-
-  return <div>Server time: {time}</div>
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-
-export const Route = createFileRoute('/api/hello')({
-  server: {
-    handlers: {
-      GET: () => json({ message: 'Hello, World!' }),
-    },
-  },
-})
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/people')({
-  loader: async () => {
-    const response = await fetch('https://swapi.dev/api/people')
-    return response.json()
-  },
-  component: PeopleComponent,
-})
-
-function PeopleComponent() {
-  const data = Route.useLoaderData()
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
+Authentication with per-user todos, drag-to-reorder, due dates, and a Playwright happy-path test
+in CI.
