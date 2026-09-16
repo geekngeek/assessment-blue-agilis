@@ -15,6 +15,24 @@ export default [
     },
   },
   {
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "MemberExpression[object.name='process'][property.name='env']",
+          message:
+            'Read configuration from `env` in src/config/env.ts instead of touching process.env directly.',
+        },
+      ],
+    },
+  },
+  {
+    // the config center is the one place allowed to read process.env
+    files: ['src/config/env.ts'],
+    rules: { 'no-restricted-syntax': 'off' },
+  },
+  {
     ignores: [
       'eslint.config.js',
       'prettier.config.js',

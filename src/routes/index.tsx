@@ -31,6 +31,8 @@ function Home() {
         <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm text-neutral-500">
           <dt>Runtime</dt>
           <dd className="font-mono">{data.runtime}</dd>
+          <dt>Database</dt>
+          <dd className="font-mono">{data.database}</dd>
           <dt>Responded</dt>
           <dd className="font-mono">{data.at}</dd>
         </dl>
